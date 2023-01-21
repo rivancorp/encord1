@@ -1,0 +1,2183 @@
+@@@ CONFIGURE RST AGAIN.
+D1:
+CONFIG T
+ip dhcp excluded-add 10.2.1.1 10.2.1.99
+ip dhcp excluded-add 10.2.1.200 10.2.1.254
+!
+ip dhcp pool vlan10
+  network 10.2.1.0 255.255.255.0
+  default-router 10.2.1.254
+!
+D2:
+CONFIG T
+ip dhcp excluded-add 10.2.1.1 10.2.1.199
+ip dhcp excluded-add 10.2.1.250 10.2.1.254
+!
+ip dhcp pool vlan10
+  network 10.2.1.0 255.255.255.0
+  default-router 10.2.1.254
+!
+A1:
+config t
+int e0/0
+ switchport mode access
+ switchport access vlan 10
+A2:
+config t
+int e1/0
+ switchport mode access
+ switchport access vlan 10
+p1:
+config t
+int e0/0
+ ip add dhcp
+ no shut
+p2:
+config t
+int e1/0
+ ip add dhcp
+ no shut
+
+TASK9.1: Combined d1 and d2 for hsrp:
+d1:
+config t
+int vlan 10
+ standby 10 ip 10.2.1.254
+ standby 10 preempt
+ standby 10 priority 150
+ standby 10 track e1/1 60
+end
+@@d2:
+config t
+int vlan 10
+ standby 10 ip 10.2.1.254
+ standby 10 preempt
+ standby 10 priority 100
+end
+
+TASK.9.2: SUPER BASIC EIGRP FOR D1/D2:
+D1:
+D1#sh ip route connected | inc C
+Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+C        10.1.4.4/30 is directly connected, Ethernet1/1
+C        10.2.1.0/24 is directly connected, Vlan10
+C        10.2.2.0/24 is directly connected, Vlan20
+C        192.168.1.128/27 is directly connected, Vlan200
+
+D1:
+config t
+router eigrp 100
+ no auto-summary
+ network 10.1.4.4 0.0.0.3
+ network 10.2.1.0 0.0.0.255
+ network 10.2.2.0 0.0.0.255
+ network 192.168.1.128 0.0.0.31
+end
+
+or NEXUS-like
+
+conf t
+	router eigrp CCNPLEVEL
+		address-family ipv4 unicast autonomous-system 100
+		network 10.1.4.6 0.0.0.0
+		network 10.2.1.1 0.0.0.0
+		network 10.2.2.1 0.0.0.0
+		network 192.168.1.129 0.0.0.0
+		end
+
+
+D2:
+config t
+router eigrp 100
+ no auto-summary
+ network 10.1.4.8 0.0.0.3
+ network 10.2.1.0 0.0.0.255
+ network 10.2.2.0 0.0.0.255
+ network 192.168.1.128 0.0.0.31
+end
+show ip eigrp neighbor
+
+or NEXUS-like
+
+conf t
+	router eigrp CCNPLEVEL
+		address-family ipv4 unicast autonomous-system 100
+		network 10.1.4.10 0.0.0.0
+		network 10.2.1.2 0.0.0.0
+		network 10.2.2.2 0.0.0.0
+		network 192.168.1.130 0.0.0.0
+		end
+	sh ip eigrp nei
+
+R4:
+config t
+router eigrp 100
+ no auto-summary
+ network 10.1.4.8 0.0.0.3
+ network 10.1.4.4 0.0.0.3
+ end
+
+OSPF NETWORK:
+R4:
+config t
+router ospf 1
+network 10.1.1.8 0.0.0.3 area 34
+
+R3:
+config t
+router ospf 1
+network 10.1.1.4 0.0.0.3 area 0
+network 10.1.1.8 0.0.0.3 area 34
+
+R2:
+config t
+router ospf 1
+network 10.1.1.4 0.0.0.3 area 0
+network 10.1.1.0 0.0.0.3 area 12
+
+R1:
+config t
+router ospf 1
+network 10.1.1.0 0.0.0.3 area 12
+
+@@@
+TASK9.3: BASIC eBGP FOR ISPS and R1.
+R1 BGP:
+config t
+router bgp 1
+ bgp log-neighbor-changes
+ neighbor 208.8.8.4 remote-as 45
+ neighbor 207.7.7.2 remote-as 2
+ neighbor 209.9.9.3 remote-as 3
+ network 10.0.0.0 Mask 255.255.255.252
+ network 207.7.7.0
+ network 208.8.8.0
+ network 209.9.9.0
+end
+@@@ISP1:
+CONFIG T
+router bgp 45
+bgp log-neighbor-changes
+neighbor 24.2.4.2 remote-as 2
+neighbor 45.4.5.5 remote-as 45
+neighbor 208.8.8.1 remote-as 1
+network 208.8.8.0
+network 24.2.4.0 mask 255.255.255.0
+network 44.44.44.44 mask 255.255.255.255
+network 45.4.5.0 mask 255.255.255.0
+!PretentInternet
+network 0.0.0.0
+ip route 0.0.0.0 0.0.0.0 null 0
+ip route 10.0.0.0 255.0.0.0 208.8.8.1
+end
+
+@@@ISP2:
+config t
+router bgp 2
+bgp log-neighbor-changes
+neighbor 24.2.4.4 remote-as 45
+neighbor 25.2.5.5 remote-as 45
+neighbor 32.3.2.3 remote-as 3
+neighbor 207.7.7.1 remote-as 1
+network 207.0.0.0
+network 22.22.22.22 mask 255.255.255.255
+network 24.2.4.0 mask 255.255.255.0
+network 25.2.5.0 mask 255.255.255.0
+network 32.3.2.0 mask 255.255.255.0
+!fakeInternet
+network 0.0.0.0
+ip route 0.0.0.0 0.0.0.0 null 0
+ip route 10.0.0.0 255.0.0.0 207.7.7.1
+end
+@@ISP3:
+CONFIG T
+router bgp 3
+bgp log-neighbor-changes
+neighbor 32.3.2.2 remote-as 2
+neighbor 35.3.5.5 remote-as 45
+neighbor 209.9.9.1 remote-as 1
+network 209.9.9.0
+network 32.3.2.0 mask 255.255.255.0
+network 33.33.33.33 mask 255.255.255.255
+network 35.3.5.0 mask 255.255.255.0
+network 0.0.0.0
+ip route 0.0.0.0 0.0.0.0 null 0
+ip route 10.0.0.0 255.0.0.0 209.9.9.1
+end
+
+Isp4:
+config t
+int lo 8
+ ip add 8.8.8.8 255.255.255.255
+router bgp 45
+ bgp log-neighbor-changes
+ neighbor 25.2.5.2 remote-as 2
+ neighbor 35.3.5.3 remote-as 3
+ neighbor 45.4.5.4 remote-as 45
+ network 8.8.8.8 mask 255.255.255.255
+ network 55.55.55.55 mask 255.255.255.255
+ network 25.2.5.0 mask 255.255.255.0
+ network 35.3.5.0 mask 255.255.255.0
+ network 45.4.5.0 mask 255.255.255.0
+end
+
+Task9.5: Redistribution Skills for CCNP
+R4:
+config t
+!ipasok ang eigrp sa mundo ng ospf
+router ospf 1
+  redistribute eigrp 100 subnets
+  exit
+!ipasok ang ospf sa mundo ng eigrp
+router eigrp 100
+  redistribute ospf 1 metric 1544 2000 255 1 1500
+
+R1:
+!redistrubte internet routes to ospf from BGP.
+config t
+router ospf 1
+ default-information originate
+end
+
+R2#
+ping 8.8.8.8
+
+
+@@static default routing in P1:
+P1:
+config t
+ip route 0.0.0.0 0.0.0.0 10.2.1.1
+do sh ip route static
+
+@@static default routing in p2:
+p2:
+config t
+ip route 0.0.0.0 0.0.0.0 10.2.1.2
+do ping 8.8.8.8
+
+@@@@@IPVV6@@@@@@@@@@
+######################################################################
+
+conf t
+alias exec bp6 show ipv6 int brief | exc down
+alias exec sr6 show ipv6 route
+alias exec sc show run | sec
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~IPV6~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+IPV6 ADDRESSING FOR THE ISP'S
+@ISP4
+	conf t
+		ipv6 unicast-routing
+		int e0/1
+			ipv6 add b:1:4:b::5/64
+		int e0/2
+			ipv6 add b:2:4:b::5/64
+		int e0/3
+			ipv6 add b:3:4:b::5/64
+			end
+
+@ISP3
+	config t
+		ipv6 unicast-routing
+		int e1/1
+			ipv6 add b:3:4:b::3/64
+		int e1/2
+			ipv6 add b:1:2:b::3/64
+		int e1/3
+			ipv6 add b:1:33:b::3/64
+			end
+			
+@ISP2
+	config t
+		ipv6 unicast-routing
+		int e0/2
+			ipv6 add b:2:4:b::2/64
+		int e1/1
+			ipv6 add b:2:1:b::2/64
+		int e1/3
+			ipv6 add b:1:22:b::2/64
+		int e1/2
+			ipv6 add b:1:2:b::2/64
+			end
+
+@ISP1
+	config t
+		ipv6 unicast-routing
+		int e1/2
+			ipv6 add b:1:4:b::4/64
+		int e1/1
+			ipv6 add b:2:1:b::4/64
+		int e1/3
+			ipv6 add b:1:11:b::4/64
+			end
+
+@R1
+	config t
+		ipv6 unicast-routing
+		int e1/3
+			ipv6 add b:1:33:b::1/64
+		int e1/2
+			ipv6 add b:1:22:b::1/64
+		int e1/1
+			ipv6 add b:1:11:b::1/64
+			end
+                ###################
+				~~~~~~~~~~~~~~~~~~~~~~~~~IPV6 BGP Configuration~~~~~~~~~~~~~~~~~~~~~~~
+@ISP4
+	conf t
+	ipv6 unicast-routing
+	int lo4
+		ipv6 add b55::1/128
+	router bgp 45
+	    !no bgp default ipv4-unicast
+		!bgp log-neighbor-changes
+		neigh b:3:4:b::3 remote-as 3
+		neigh b:2:4:b::2 remote-as 2
+		neigh b:1:4:b::4 remote-as 45
+		address-family ipv6
+			neigh b:3:4:b::3 activate
+			neigh b:2:4:b::2 activate
+			neigh b:1:4:b::4 activate
+			network b55::1/128
+			network b:3:4:b::/64
+			network b:2:4:b::/64
+			network b:1:4:b::/64
+			end
+			
+@ISP3
+	conf t
+		ipv6 unicast-routing
+		int lo3
+			ipv6 add b33::1/128
+		router bgp 3
+			neigh b:3:4:b::5 remote-as 45
+			neigh b:1:2:b::2 remote-as 2
+			neigh b:1:33:b::1 remote-as 1
+			address-family ipv6
+				neigh b:3:4:b::5 activate
+				neigh b:1:2:b::2 activate
+				neigh b:1:33:b::1 activate
+				network b:3:4:b::/64
+				network b:1:2:b::/64
+				network b:1:33:b::/64
+				network b33::1/128
+				end
+				
+@ISP2
+	conf t
+	ipv6 unicast-routing
+	int lo2
+		ipv6 add b22::1/128
+		router bgp 2
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+				
+@ISP1
+	conf t
+	ipv6 unicast-routing
+	int lo1
+		ipv6 add b44::1/128
+		router bgp 45
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+				
+@R1
+	conf t
+		ipv6 unicast-routing
+		router bgp 1
+			neigh b:1:33:b::3 remote-as 3
+			neigh b:1:22:b::2 remote-as 2
+			neigh b:1:11:b::4 remote-as 45
+			address-family ipv6
+				neigh b:1:33:b::3 activate
+				neigh b:1:22:b::2 activate
+				neigh b:1:11:b::4 activate
+				network FEC0:1::/122
+				network b:1:33:b::/64
+				network b:1:22:b::/64
+				network b:1:11:b::/64
+				end
+TEST:
+R1#show bgp ipv6 summary
+Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+B:1:11:B::4     4           45      10      10       13    0    0 00:02:14       11
+B:1:22:B::2     4            2       8      10       13    0    0 00:02:17       12
+B:1:33:B::3     4            3      10      10       13    0    0 00:02:22       11
+% NOTE: This command is deprecated. Please use 'show bgp ipv6 unicast'
+
+ISP2#show bgp ipv6 summary
+
+Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+B:1:2:B::3      4            3      10       9       13    0    0 00:03:11        9
+B:1:22:B::1     4            1      11       9       13    0    0 00:02:59        9
+B:2:1:B::4      4           45      11       9       13    0    0 00:03:06        9
+B:2:4:B::5      4           45      10       9       13    0    0 00:03:09       10
+% NOTE: This command is deprecated. Please use 'show bgp ipv6 unicast'
+
+#Test connectivity. Dapat mag ping lahat			
+@ISP4
+	ping b:3:4:b::3 !ISP4
+	ping b:2:4:b::2 !ISP2
+	ping b:1:4:b::4 !ISP1
+	
+@ISP2
+	ping b:1:2:b::3 !ISP3
+	ping b:2:4:b::5 !ISP4
+	ping b:2:1:b::4 !ISP1
+	ping b:1:22:b::1 !R1
+	
+@R1
+	ping b:1:33:b::3 !ISP3
+	ping b:1:22:b::2 !ISP2
+	ping b:1:11:b::4 !ISP1
+
+show ipv6 route
+!patient is a virtue
+R1:
+
+
+#CHECKING!
+@ISP2
+	show bgp ipv6 nei
+	show bgp ipv6 sum !Dapat Apat ang lumabas
+	
+@R1
+
+R1#sh ipv6 route bgp
+B   B:1:2:B::/64 [20/0]
+     via FE80::A8BB:CCFF:FE00:E31, Ethernet1/2
+B   B:1:4:B::/64 [20/0]
+     via FE80::A8BB:CCFF:FE00:F31, Ethernet1/1
+B   B:2:1:B::/64 [20/0]
+     via FE80::A8BB:CCFF:FE00:E31, Ethernet1/2
+B   B:2:4:B::/64 [20/0]
+     via FE80::A8BB:CCFF:FE00:F31, Ethernet1/1
+B   B:3:4:B::/64 [20/0]
+     via FE80::A8BB:CCFF:FE00:D31, Ethernet1/3
+B   B22::1/128 [20/0]
+     via FE80::A8BB:CCFF:FE00:E31, Ethernet1/2
+
+	ping b55::1
+	ping b44::1
+	ping b33::1
+	ping b22::1
+############################################################################
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Configure ipv6 address on the ospf AREA~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~
+@R1
+	conf t
+		ipv6 unicast-routing
+		interface Loopback1
+			description Test I/F for BGP, OSPFv2 & OSPFv3 Routing
+			ip address 1.1.1.1 255.255.255.255
+			ipv6 address FEC0:1::1/122
+		int e1/0
+			ipv6 address 2026::12:1/122
+			end
+
+@R2
+	conf t
+		ipv6 unicast-routing
+		interface Loopback2
+			description Test I/F for OSPFv2 & OSPFv3 Routing
+			ip address 2.2.2.2 255.255.255.255
+			ipv6 address FEC0:2::2/122
+		int e1/2
+			ipv6 address 2026::12:2/122
+		int e1/1
+			ipv6 address 2026::1:1/122
+			end
+
+@R3
+	conf t
+		ipv6 unicast-routing
+		interface Loopback3
+			description Test I/F for OSPFv2 & OSPFv3 Routing
+			ip address 3.3.3.3 255.255.255.255
+			ipv6 address FEC0:3::3/122
+		interface Tunnel34
+			no ip address
+			ipv6 address 2026::34:1/122
+			tunnel source lo3
+			tunnel destination 4.4.4.4
+			tunnel mode ipv6ip
+		int e1/1
+			ipv6 address 2026::1:2/122
+			end
+
+@R4
+	conf t
+		ipv6 unicast-routing
+		interface Loopback4
+			description Test I/F for OSPFv2 & OSPFv3 Routing
+			ip address 4.4.4.4 255.255.255.255
+			ipv6 address FEC0::4:4/122
+		interface e1/0
+			description L3 Link to DSW1
+			ip address 10.1.4.5 255.255.255.252
+			ipv6 address 2026::2:1/122 
+		interface e1/1
+			description L3 Link to DSW2 fa0/14
+			ip address 10.1.4.9 255.255.255.252
+		interface Loopback14
+			description Test I/F for RIPng Routing
+			no ip address
+			ipv6 address FEC0::14:4/122
+		interface Loopback21
+			description Test I/F for EIGRPv4 Routing & IP(v4) Helper Loopback I/F
+			ip address 10.1.21.129 255.255.255.224
+		interface Tunnel34
+	    !creating a tunnel for the ipv6 connection of router 3 and router 4
+			no ip address
+			ipv6 address _____::__:__/122
+			tunnel source ____
+			tunnel destination ________
+			tunnel mode ipv6ip
+			end
+			
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			end
+##################################
+
+####################################################################################################
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ROUTING FOR OSPF~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+		
+@R1
+	conf t
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+			end
+			
+@R2
+	conf t
+		ipv6 router ospf 6
+			router-id 2.2.2.2
+		int lo2
+			ipv6 ospf 6 area 0
+		int e1/1
+			ipv6 ospf 6 area 0
+		int e1/2
+			ipv6 ospf 6 area 12
+			end
+@R3
+	conf t
+		ipv6 router ospf 6
+			router-id 3.3.3.3
+		int lo3
+			ipv6 ospf 6 area 0
+		interface Tunnel34
+			ipv6 ospf 6 area 34
+		int e1/1
+			ipv6 ospf 6 area 0
+			end
+
+@R4
+	conf t
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+			end
+####################################################################################################
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!!TUNNELING!!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#TESTING TIME! IPv6 is dependent on IPv4
+
+@R3
+	ping 2026::34:1 !Mag piping ito
+	ping 2026::34:2 !Di mag piping ito
+	show run | sec ospf !show ospf routes
+	conf t
+		router ospf 1
+			network 3.3.3.3 0.0.0.0 area 34
+			network 10.1.1.8 0.0.0.3 area 34
+			end
+			
+@R4
+	show run | sec ospf !show ospf routes
+	conf t
+		router ospf 1
+			network ______ 0.0.0.0 area 34
+			network 10.1.1.8 _______ area 34
+			end
+
+#TESTING
+@R4
+	show ipv6 route ospf
+	ping 2026::12:1
+	
+#MOVING ON
+
+
+#################################
+
+R1:
+config t
+ipv6 router ospf 6
+  default-information originate always
+  redistribute bgp 1 metric 69
+  
+OSPFv3 to BGP:
+R1:
+config t
+router bgp 1
+  address-family ipv6 unicast
+   redistribute ospf 6 match internal external 1 external 2
+  
+ ####################################################################################################
+~~~~~~~~~~~~~~~~~~~~~~~CONFIGURE INTERNAL NETWORK  IPV6 ADDRESSING~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+@R4
+	config t
+		int e 1/0
+			ipv6 add 10:1:4:14::4/64
+		int e 1/1
+			ipv6 add 10:1:4:24::4/64
+			end
+
+@D1
+	conf t
+		ipv6 unicast-routing
+		interface Loopback1
+			description IPv4, IPv6 & RIPng Test I/F
+			ip address 11.11.11.11 255.255.255.255
+			ipv6 add 11:11:11:11::1/128
+			ipv6 address FEC0::11:1/122
+		interface e1/1
+			description L3 UpLink to R4
+			no switchport
+			ip address 10.1.4.6 255.255.255.252
+			ipv6 address 2026::2:2/122
+			ipv6 add 10:1:4:14::1/64
+		interface vlan 200
+			description IPv6 Link to DSW2
+			ipv6 address 2026::3:1/122
+			ipv6 add 192:168:1:1234::1/64
+		int vlan 10
+			ipv6 add 10:2:1:12::1/64
+		int vlan 20
+			ipv6 add 10:2:2:12::1/64
+			end
+@D2
+	conf t
+		ipv6 unicast-routing
+		interface Loopback2
+			description IPv4, IPv6 & RIPng Test I/F
+			ip address 22.22.22.22 255.255.255.255
+			ipv6 add 22:22:22:22::2/128
+			ipv6 address FEC0::22:2/122
+		int e 1/1
+			ipv6 add 10:1:4:24::2/64
+		interface vlan 200
+			description IPv6 Link to DSW1
+			ipv6 address 2026::3:2/122
+			ipv6 add 192:168:1:1234::2/64
+		int vlan 10
+			ipv6 add 10:2:1:12::2/64
+		int vlan 20
+			ipv6 add 10:2:2:12::2/64
+			end
+			
+			
+##########################################################
+
+#######################################################################################################
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#CONFIGURE EIGRP FOR R4, D1 and D2~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#CONFIGURE EIGRP FOR R4, D1 and D2~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+@R4
+	conf t
+		ipv6 router eigrp 10
+			eigrp router-id 4.4.4.4
+			no shut
+		int lo4
+			ipv6 eigrp 10
+		int e1/0
+			ipv6 eigrp 10
+		int e1/1
+			ipv6 eigrp 10
+			end
+			
+@D1
+	conf t
+		int lo1
+			ipv6 add 11:11:11:11::1/64
+		ipv6 router eigrp 10
+			eigrp router-id 1.1.1.1
+			no shut
+		int lo1
+			ipv6 eigrp 10
+		int e1/1
+			ipv6 eigrp 10
+		int vlan 10
+			ipv6 eigrp 10
+		int vlan 20
+			ipv6 eigrp 10
+		int vlan 200
+			ipv6 eigrp 10
+			end
+			
+@D2
+	conf t
+		int lo1
+			ipv6 add 22:22:22:22::2/64
+		ipv6 router eigrp 10
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+___________________________?
+			end
+			
+			
+			
+
+####################################################################################################
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~END DEVICES CONFIGURATION~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+#Moving On
+@A1
+	cn
+	show run int e0/0
+	
+@A2
+	cn
+	show run int e0/0
+	
+@P1
+	conf t
+		
+		ipv6 unicast-routing
+		int e0/0
+		shutdown
+		ipv6 en
+		ipv6 add 10:2:1:12::B00B/64
+		end
+	ping 10:1:12:B00B
+	ping 10:2:1:12::2
+	conf t
+		ipv6 unicast-routing
+		int e0/0
+		ipv6 add autoconfig
+		end
+	ping 10:2:1:12::2
+	show ipv6 int brief
+	
+@P2
+	config t
+	ipv6 unicast-routing
+	ipv6 route ::/0 10:2:1:12::2
+	int e1/0
+		ipv6 address 10:2:1:12::/64 eui-64
+		end
+	ping 10:2:1:12::2
+	show ipv6 int brief
+	show ipv6 int brief
+
+
+##############################TRy This!!!###########################################################
+
+
+R4:
+!REDISTRIBUTE EIGRP TO OSPF
+conf t
+	ipv6 router ospf 6
+		redistribute eigrp 10 include-connected 
+
+!REDISTRIBUTE OSPF TO EIGRP
+config t
+	ipv6 router eigrp 10
+		redistribute ospf 6 metric 10000 100 255 1 1500 include-connected
+
+
+
+####################################################################################################
+~~~~~~~~~~~~~~~~~~~~~~~~~~~CONFIGURE IPV6 DEFAULT STATIC ROUTING FOR P1 & P2~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+@P1
+	conf t
+		ipv6 route ::/0 10:2:1:12::1
+		end
+		
+@P2
+	conf t
+		ipv6 route ::/0 10:2:1:12::2
+		end
+
+
+@@ ADVANCE BGP, OSPF AND EIGRP CONCEPTS.
+
+The BGP path attributes are the characteristics for all BGP advertised routes. Additionally to the necessary informations to perform basic routing , the path attributes allow BGP to set routing policies and advertise them. Each attribute is a member of one of the following categories:
+
+Well-known mandatory – This attribute has to be known and implemented by all BGP implementations
+
+Well-known discretionary – This attribute has to be known by all BGP implementations, but does not have to be sent in an update message.
+
+Optional transitive – This attribute does not have to be known by all BGP implementations but the BGP prozess has to accept the path within the attribute is found and forward it to other BGP peers, even though the BGP process doesnt know the attribute.
+
+Optional non-transitive – An update with an attribute from this category can be ignored. The router does not have to advertise this route nor the path to its peers.
+
+
+Before we dig into modifications, let's review the default BGP path selection process. An in-depth analysis of the BGP path selection mechanism on Cisco IOS can be found here. A simplified summary of the process follows.
+
+1.Prefer the route with the highest weight (a local, Cisco-proprietary parameter).
+2. Prefer the route with the highest local preference.
+3. Prefer locally-originated routes over those learned from a neighbor.
+4. Prefer the route with the shortest AS path.
+5. Prefer IGP-learned routes over those with an unknown origin.
+6. Prefer the route with the lowest MED (per AS).
+7. Prefer EBGP-learned routes over IBGP-learned routes.
+8. Prefer the route whose next-hop address has the lowest IGP metric.
+9. Multipath determination
+10. If a best path exists, prefer it over newer routes.
+11. Prefer the route from the router with the lowest router ID.
+12. If the router IDs match, prefer the lowest neighbor IP address.
+
+Why Isp does isp4 prefer to use?: r4#show ip bgp
+
+
+ADVANCE BGP Task1:
+
+Task1: In Depth BGP config.
+#WHY PORN SITES ARE SLOW: BLAME BGP!
+
+
+@R1
+	show ip bgp summary
+	#NOC = Network Operation Center; NOK Packets = Notification, Open, Keep Alive, "UPDATE"
+	#UPDATE Packet contains: Weight, LocPrf, Self Originated, AS Path, Origin, Metric, Ex/Internal over BGP
+	#Wm, Wd, Ot, On = Well-known Mandatory, Well-known Discretionary, Optional Transitive, Optional Nontransitive
+	ping 55.55.55.55
+	traceroute 55.55.55.55
+	show ip bgp
+
+R1#sh ip bgp
+RPKI validation codes: V valid, I invalid, N Not found
+
+     Network          Next Hop            Metric LocPrf Weight Path
+ *   0.0.0.0          209.9.9.3                0             0 3 i
+ *   55.55.55.55/32   209.9.9.3                              0 3 45 i
+ *                    207.7.7.2                              0 2 45 i
+ *>                   208.8.8.4                              0 45 i ???
+...
+ *   32.3.2.0/24      208.8.8.4                              0 45 2 i
+ *                    209.9.9.3                0             0 3 i
+ *>                   207.7.7.2                0             0 2 i  ???
+
+
+R1#traceroute 55.55.55.55
+Type escape sequence to abort.
+Tracing the route to 55.55.55.55
+VRF info: (vrf in name/id, vrf out name/id)
+  1 208.8.8.4 1 msec 0 msec 0 msec
+  2 45.4.5.5 [AS 45] 1 msec *  1 msec
+
+
+What if, in R1:
+conf t
+	int e1/1
+	 shut
+	  do clear ip bgp * soft	!This is to send new NOK Packets (Only tie breaker is router id)
+	  do sh ip bgp !Dinaan yung packet sa 207
+	  no shut
+	  do clear ip bgp * soft
+	  do sh ip bgp
+	 end
+			
+#HOW TO USE ROUTE MAPS
+#Route-Map: AMS = "Access List, Match, Set" easier thru practice!
+
+in R1, the path going to 55.55.55.55 least preferred is: 209.9.9.3. lets
+make this the most liked Path.
+
+	conf t
+		router bgp 1
+			nei 209.9.9.3 weight 200
+			end
+	clear ip bgp * soft
+	sh ip bgp 55.55.55.55
+
+R1#traceroute 55.55.55.55
+Type escape sequence to abort.
+Tracing the route to 55.55.55.55
+VRF info: (vrf in name/id, vrf out name/id)
+  1 209.9.9.3 2 msec 0 msec 1 msec
+  2 35.3.5.5 [AS 3] 0 msec *  1 msec
+
+#Return R1 to normal
+conf t
+  router bgp 1
+    no nei 209.9.9.3 weight 200
+	end
+	clear ip bgp * soft
+	sh ip bgp
+
+Let us Play a Bit:
+
+ISP4:
+config t
+interface Loopback1
+ ip address 51.51.51.51 255.255.255.255
+interface Loopback2
+ ip address 52.52.52.52 255.255.255.255
+interface Loopback3
+ ip address 53.53.53.53 255.255.255.255
+interface Loopback4
+ ip address 54.54.54.54 255.255.255.255
+router bgp 45
+ network 51.51.51.51 mask 255.255.255.255
+ network 52.52.52.52 mask 255.255.255.255
+ network 53.53.53.53 mask 255.255.255.255
+ network 54.54.54.54 mask 255.255.255.255
+end
+
+R1:
+show ip bgp summ
+ *   51.51.51.51/32   207.7.7.2                              0 2 45 i
+ *>                   208.8.8.4                              0 45 i
+ *   52.52.52.52/32   207.7.7.2                              0 2 45 i
+ *>                   208.8.8.4                              0 45 i
+ *   53.53.53.53/32   207.7.7.2                              0 2 45 i
+ *>                   208.8.8.4                              0 45 i
+ *   54.54.54.54/32   209.9.9.3                              0 3 45 i
+ *>                   208.8.8.4                              0 45 i
+ *                    207.7.7.2                              0 2 45 i
+
+
+We want to do this,
+if we want to go to 51.51.51.51 we use isp1: do nothing!
+if we want to go to 52.52.52.52 we use isp2(207.7.7.2)
+if we want to go to 53.53.53.53 we use isp3(209.9.9.3)
+
+AMS: access,match,set....
+
+R1: weight is local Only,
+config t
+access-list 52 permit host 52.52.52.52
+access-list 53 permit host 53.53.53.53
+route-map ISP2for52 permit 10
+ match ip address 52
+ set weight 152
+route-map ISP2for52 permit 20
+!
+route-map ISP3for53 permit 10
+ match ip address 53
+ set weight 153
+route-map ISP3for53 permit 20
+!
+router bgp 1
+ neighbor 207.7.7.2 route-map ISP2for52 in
+ neighbor 209.9.9.3 route-map ISP3for53 in
+end
+clear ip bgp * soft
+
+R1#traceroute 52.52.52.52
+Type escape sequence to abort.
+Tracing the route to 52.52.52.52
+VRF info: (vrf in name/id, vrf out name/id)
+  1 207.7.7.2 1 msec 0 msec 1 msec
+  2 24.2.4.4 [AS 45] 0 msec 0 msec 0 msec
+  3 45.4.5.5 [AS 45] 1 msec *  1 msec
+R1#traceroute 53.53.53.53
+Type escape sequence to abort.
+Tracing the route to 53.53.53.53
+VRF info: (vrf in name/id, vrf out name/id)
+  1 209.9.9.3 0 msec 1 msec 0 msec
+  2 35.3.5.5 [AS 45] 1 msec *  1 msec
+
+  R1#
+But for, 51.51.51.51
+R1#traceroute 51.51.51.51 
+Type escape sequence to abort.
+Tracing the route to 51.51.51.51
+VRF info: (vrf in name/id, vrf out name/id)
+  1 208.8.8.4 0 msec 5 msec 1 msec
+  2 45.4.5.5 [AS 45] 0 msec *  1 msec
+  
+Bring Back to Normal:
+
+R1
+config t
+router bgp 1
+ no neighbor 207.7.7.2 route-map ISP2for52 in
+ no neighbor 209.9.9.3 route-map ISP3for53 in
+end
+clear ip bgp * soft
+
+We want:
+51.51.51.51 and 52.52.52.52 to ISP2:
+and
+53.53.53.53 and 54.54.54.54 to ISP3:
+
+R1:
+_________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+end
+clear ip bgp * soft
+
+R1:
+ *   51.51.51.51/32   209.9.9.3                              0 3 45 i
+ *>                   207.7.7.2                            152 2 45 i
+ *                    208.8.8.4                              0 45 i
+ *   52.52.52.52/32   209.9.9.3                              0 3 45 i
+ *>                   207.7.7.2                            152 2 45 i
+ *                    208.8.8.4                              0 45 i
+ *   53.53.53.53/32   207.7.7.2                              0 2 45 i
+ *>                   209.9.9.3                            153 3 45 i
+ *                    208.8.8.4                              0 45 i
+ *>  54.54.54.54/32   209.9.9.3                            153 3 45 i
+ *                    207.7.7.2                              0 2 45 i
+ *                    208.8.8.4                              0 45 i
+ *   55.55.55.55/32   209.9.9.3                              0 3 45 i
+ *                    207.7.7.2                              0 2 45 i
+ *>                   208.8.8.4                              0 45 i
+
+or
+
+will this work?
+
+R1:
+config t
+no access-list 51
+no access-list 52
+no access-list 53
+no access-list 54
+access-list 51 permit host 51.51.51.51
+access-list 51 permit host 52.52.52.52
+access-list 53 permit host 53.53.53.53
+access-list 53 permit host 54.54.54.54
+route-map ISP2for5152 permit 10
+ match ip address 51
+ set weight 152
+route-map ISP2for5152 permit 20
+!
+route-map ISP3for5354 permit 10
+ match ip address 53
+ set weight 153
+route-map ISP3for5354 permit 20
+!
+router bgp 1
+ neighbor 207.7.7.2 route-map ISP2for5152 in
+ neighbor 209.9.9.3 route-map ISP3for5354 in
+end
+clear ip bgp * soft
+
+Its a disaster, learn by Mistakes! playtime.
+
+Bring it back to normal:
+r1:
+config t
+router bgp 1
+ no neighbor 207.7.7.2 route-map ISP2for5152 in
+ no neighbor 209.9.9.3 route-map ISP3for5354 in
+end
+clear ip bgp * soft
+
+If we want to have 33.33.33.33 and 22.22.22.22 from isp1(208.8.8.4)?
+
+R1:
+_________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+end
+!
+
+or
+
+r1:
+config t
+_________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+end
+end
+clear ip bgp * soft
+!
+
+TASK #3 - UNDERSTANDING LOCAL PREFERENCE ATTRIBUTE
+#Keyword: Local
+#Req: Must have same AS number
+#NOTE: Local Pref >= 100: IDAAN MO SA AKIN
+#NOTE: Local Pref < 100: WAG MO IDAAN SA AKIN
+#Keyword sa Local Pref: AS Number
+
+Well-known Discretionary:
+	- Must be supported, propagation optional
+	
+ISP1: add More routes:
+	conf t
+		int lo 1
+			ip add 41.41.41.41 255.255.255.255
+		int lo 2
+			ip add 42.42.42.42 255.255.255.255
+		int lo 3
+			ip add 43.43.43.43 255.255.255.255
+		int lo 5
+			ip add 45.45.45.45 255.255.255.255
+		router bgp 45
+			network 41.41.41.41 mask 255.255.255.255			
+			network 42.42.42.42 mask 255.255.255.255			
+			network 43.43.43.43 mask 255.255.255.255
+			network 45.45.45.45 mask 255.255.255.255
+		end
+ISP4 bec. its in the Same AS45!
+
+isp4:
+show ip bgp
+ *>i 41.41.41.41/32   45.4.5.4                 0    100      0 i
+ *>i 42.42.42.42/32   45.4.5.4                 0    100      0 i
+ *>i 43.43.43.43/32   45.4.5.4                 0    100      0 i
+ *>i 44.44.44.44/32   45.4.5.4                 0    100      0 i
+ * i 45.4.5.0/24      45.4.5.4                 0    100      0 i
+	
+We want to Tell ISP4, that we have:
+41.41.41.41 local pref of 414
+and
+42.42.42.42 local pref of 424
+and
+43.43.43.43 MUST be BLOCKED!!!
+and
+everything Else is normal:
+
+isp1:
+config t
+access-list 41 permit host 41.41.41.41
+access-list 42 permit host 42.42.42.42
+access-list 43 permit host 43.43.43.43
+route-map LP1 permit 10
+ match ip address 41
+  set local-pref 414
+route-map LP1 permit 20
+ match ip address 42
+  set local-pref 424
+route-map LP1 Deny 30
+ match ip address 43
+route-map LP1 Permit 40
+		router bgp 45
+			neighbor 45.4.5.5 route-map LP1 out
+			do clear ip bgp *
+end
+
+isp4:
+show ip bgp
+ *>i 41.41.41.41/32   45.4.5.4                 0    414      0 i
+ *>i 42.42.42.42/32   45.4.5.4                 0    424      0 i
+ *>i 44.44.44.44/32   45.4.5.4                 0    100      0 i
+ * i 45.4.5.0/24      45.4.5.4                 0    100      0 i
+ *>                   0.0.0.0                  0         32768 i
+ *>i 45.45.45.45/32   45.4.5.4                 0    100      0 i
+
+Your Turn:
+
+We want to Tell ISP4, that we have:
+41.41.41.41 local pref of 411
+and
+42.42.42.42 local pref of 422
+and
+43.43.43.43 local pref of 433
+and
+45.45.45.45 must be blocked.
+and
+everything Else is normal:
+
+ISP1:
+
+isp1:
+_________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+end
+end
+
+isp4:
+ *>i 41.41.41.41/32   45.4.5.4                 0    411      0 i
+ *>i 42.42.42.42/32   45.4.5.4                 0    422      0 i
+ *>i 43.43.43.43/32   45.4.5.4                 0    433      0 i
+ *>i 44.44.44.44/32   45.4.5.4                 0    100      0 i
+ * i 45.4.5.0/24      45.4.5.4                 0    100      0 i
+ 
+ 
+ISP1:
+sh ip bgp
+*>i 51.51.51.51/32   45.4.5.5                 0    100      0 i
+ *>i 52.52.52.52/32   45.4.5.5                 0    100      0 i
+ *>i 53.53.53.53/32   45.4.5.5                 0    100      0 i
+ *>i 54.54.54.54/32   45.4.5.5                 0    100      0 i
+ *>i 55.55.55.55/32   45.4.5.5                 0    100      0 i
+!
+have isp4:tell isp1:
+51.51.51.51 will have localpref of 51
+52.52.52.52 will have locappref of 52
+53.53.53.53 and 54.54.54.54 will be blocked!
+all else is normal.
+
+In isp4:
+config t
+_________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+end
+end
+
+ISP1:
+sh ip bgp
+ *>i 51.51.51.51/32   45.4.5.5                 0     51      0 i
+ *>i 52.52.52.52/32   45.4.5.5                 0     52      0 i
+ *>i 55.55.55.55/32   45.4.5.5                 0    100      0 i
+ * i 207.7.7.0        25.2.5.2                 0    100      0 2 i
+
+Bring back to normal:
+isp1:
+config t
+router bgp 45
+ no  neighbor 45.4.5.5 route-map LP1 out
+ 
+isp4:
+sh run | sec bgp
+
+R1:
+
+
+ASPATH: battle of the ISP, show phil isp bgp:
+
+R1:
+*>  22.22.22.22/32   208.8.8.4                            233 45 2 i
+ *                    209.9.9.3                              0 3 2 i
+ *                    207.7.7.2                0             0 2 i
+*>  33.33.33.33/32   208.8.8.4                            233 45 3 i
+ *                    209.9.9.3                0             0 3 i
+ *                    207.7.7.2                              0 2 3 i
+ *   44.44.44.44/32   209.9.9.3                              0 3 45 i
+ *                    207.7.7.2                              0 2 45 i
+ *>                   208.8.8.4                0             0 45 i
+*   55.55.55.55/32   207.7.7.2                              0 2 45 i
+ *>                   208.8.8.4                              0 45 i
+ *                    209.9.9.3                              0 3 45 i
+55.55.55.55 thru:
+33.33.33.33 thru:
+22.22.22.22 thru:
+44.44.44.44 thru:
+
+The power of ASPATH, you can tell other routers to use other ISPs  (not yours!) to be
+routed: in this case, ISP1 and ISP3 will tell R1 to use ISP2 a lot!!!
+
+@ISP1
+	config t
+		route-map ASPATH permit 10
+			set as-path prepend 45 45 45 45 45
+			exit
+		router bgp 45
+			neighbor 208.8.8.1 route-map ASPATH OUT
+			do clear ip bgp * soft
+			end
+
+@ISP3
+	config t
+_________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+end
+
+
+R1:
+
+     Network          Next Hop            Metric LocPrf Weight Path
+ *   0.0.0.0          208.8.8.4                0             0 45 45 45 45 45 45 i
+ *                    209.9.9.3                0             0 3 3 3 3 3 3 3 3 3 3 3 i
+ *>                   207.7.7.2                0             0 2 i
+ *>  22.22.22.22/32   208.8.8.4                            233 45 45 45 45 45 45 2 i
+ *                    209.9.9.3                              0 3 3 3 3 3 3 3 3 3 3 3 2 i
+ *                    207.7.7.2                0             0 2 i
+ *   24.2.4.0/24      208.8.8.4                0             0 45 45 45 45 45 45 i
+ *                    209.9.9.3                              0 3 3 3 3 3 3 3 3 3 3 3 2 i
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>                   207.7.7.2                0             0 2 i
+ *   25.2.5.0/24      208.8.8.4                              0 45 45 45 45 45 45 i
+ *                    209.9.9.3                              0 3 3 3 3 3 3 3 3 3 3 3 2 i
+ *>                   207.7.7.2                0             0 2 i
+ *   32.3.2.0/24      208.8.8.4                              0 45 45 45 45 45 45 2 i
+ *                    209.9.9.3                0             0 3 3 3 3 3 3 3 3 3 3 3 i
+ *>                   207.7.7.2                0             0 2 i
+ *>  33.33.33.33/32   208.8.8.4                            233 45 45 45 45 45 45 3 i
+ *                    209.9.9.3                0             0 3 3 3 3 3 3 3 3 3 3 3 i
+ *                    207.7.7.2                              0 2 3 i
+ *   35.3.5.0/24      208.8.8.4                              0 45 45 45 45 45 45 i
+ *                    209.9.9.3                0             0 3 3 3 3 3 3 3 3 3 3 3 i
+ *>                   207.7.7.2                              0 2 3 i
+ *   41.41.41.41/32   209.9.9.3                              0 3 3 3 3 3 3 3 3 3 3 3 45 i
+     Network          Next Hop            Metric LocPrf Weight Path
+ *>                   207.7.7.2                              0 2 45 i
+ *                    208.8.8.4                0             0 45 45 45 45 45 45 i
+ *   42.42.42.42/32   209.9.9.3                              0 3 3 3 3 3 3 3 3 3 3 3 45 i
+ *>                   207.7.7.2                              0 2 45 i
+ *                    208.8.8.4                0             0 45 45 45 45 45 45 i
+	
+R1#traceroute 22.22.22.22
+Type escape sequence to abort.
+Tracing the route to 22.22.22.22
+VRF info: (vrf in name/id, vrf out name/id)
+  1 207.7.7.2 1 msec *  1 msec
+R1#traceroute 33.33.33.33
+Type escape sequence to abort.
+Tracing the route to 33.33.33.33
+VRF info: (vrf in name/id, vrf out name/id)
+  1 207.7.7.2 1 msec 0 msec 1 msec
+  2 32.3.2.3 [AS 2] 0 msec *  1 msec
+R1#traceroute 44.44.44.44
+Type escape sequence to abort.
+Tracing the route to 44.44.44.44
+VRF info: (vrf in name/id, vrf out name/id)
+  1 207.7.7.2 1 msec 0 msec 0 msec
+  2 24.2.4.4 [AS 2] 1 msec *  25 msec
+R1#traceroute 55.55.55.55
+Type escape sequence to abort.
+Tracing the route to 55.55.55.55
+VRF info: (vrf in name/id, vrf out name/id)
+  1 207.7.7.2 2 msec 0 msec 1 msec
+  2 25.2.5.5 [AS 2] 0 msec *  1 msec
+  
+IF ISP2 will shout: DO NOT USE ME AT ALL!!!!!!
+
+@ISP2
+	config t
+_________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+
+end
+			end
+	
+ISP2 is not being used at all!
+
+R1#traceroute 22.22.22.22
+Type escape sequence to abort.
+Tracing the route to 22.22.22.22
+VRF info: (vrf in name/id, vrf out name/id)
+  1 208.8.8.4 0 msec 1 msec 0 msec
+  2 24.2.4.2 [AS 45] 0 msec *  1 msec
+R1#traceroute 33.33.33.33
+Type escape sequence to abort.
+Tracing the route to 33.33.33.33
+VRF info: (vrf in name/id, vrf out name/id)
+  1 208.8.8.4 1 msec 0 msec 1 msec
+  2 45.4.5.5 [AS 45] 0 msec 1 msec 0 msec
+  3 35.3.5.3 [AS 45] 1 msec *  0 msec
+  
+Bring back to Normal:
+
+isp1:
+config t
+		router bgp 45
+			no neighbor 208.8.8.1 route-map ASPATH OUT
+			
+isp2:
+config t
+		router bgp 2
+			no neighbor 207.7.7.1 route-map ASPATH2 OUT
+			
+isp3:
+config t
+		router bgp 3
+			no neighbor 209.9.9.1 route-map ASPATH3 OUT
+
+
+Use route-maps:
+
+R1:
+*   41.41.41.41/32   209.9.9.3                              0 3 45 i
+ *                    207.7.7.2                              0 2 45 i
+ *>                   208.8.8.4                0             0 45 i
+ *   42.42.42.42/32   209.9.9.3                              0 3 45 i
+ *                    207.7.7.2                              0 2 45 i
+ *>                   208.8.8.4                0             0 45 i
+ *   43.43.43.43/32   209.9.9.3                              0 3 45 i
+ *                    207.7.7.2                              0 2 45 i
+ *>                   208.8.8.4                0             0 45 i
+ *   44.44.44.44/32   209.9.9.3                              0 3 45 i
+ *                    207.7.7.2                              0 2 45 i
+ *>                   208.8.8.4                0             0 45 i
+ *   45.4.5.0/24      209.9.9.3                              0 3 45 i
+ *>                   208.8.8.4                0             0 45 i
+ *                    207.7.7.2                              0 2 45 i			
+			
+r1, uses isp1 for all routes on the 4x.4x.4x.4x., we set to:
+ISP1 will tell R1 not to use itself for 41.41.41.41 and 43.43.43.43, and the
+others normally,
+
+@ISP1
+	conf t
+		access-list 41 permit host 41.41.41.41
+		access-list 43 permit host 43.43.43.43
+		access-list 45 permit host 45.45.45.45
+		route-map ASPATH4 permit 10
+			match ip address 41 43 45
+			set as-path prepend 45 45 45 45 45
+		route-map ASPATH4 permit 20
+		router bgp 45
+			neighbor 208.8.8.1 route-map ASPATH4 out
+			do clear ip bgp * soft
+			end
+			
+R1:
+*   41.41.41.41/32   209.9.9.3                              0 3 45 i
+ *>                   207.7.7.2                              0 2 45 i
+ *                    208.8.8.4                0             0 45 45 45 45 45 45 i
+ *   42.42.42.42/32   209.9.9.3                              0 3 45 i
+ *                    207.7.7.2                              0 2 45 i
+ *>                   208.8.8.4                0             0 45 i
+ *   43.43.43.43/32   209.9.9.3                              0 3 45 i
+ *>                   207.7.7.2                              0 2 45 i
+ *                    208.8.8.4                0             0 45 45 45 45 45 45 i
+ *   44.44.44.44/32   209.9.9.3                              0 3 45 i
+ *                    207.7.7.2                              0 2 45 i
+ *>                   208.8.8.4                0             0 45 i
+ *   45.4.5.0/24      209.9.9.3                              0 3 45 i
+ *>                   208.8.8.4                0             0 45 i
+ *                    207.7.7.2                              0 2 45 i
+ *   45.45.45.45/32   209.9.9.3                              0 3 45 i
+ *>                   207.7.7.2                              0 2 45 i
+ *                    208.8.8.4                0             0 45 45 45 45 45 45 i
+
+Your turn:
+
+isp1:
+config t
+	router bgp 45
+		no neighbor 208.8.8.1 route-map ASPATH4 out
+			
+r1, uses isp1 for all routes on the 4x.4x.4x.4x., we set to:
+ISP1 will tell R1 not to use itself for 42.42.42.42 and 44.44.44.44, and the
+others normally,
+
+@ISP1
+	conf t
+_________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+
+			end
+	
+Multi-Exit Discriminator:
+MED: multi exit discrimator is another path selection
+     attribute that tells Another AS (normally u have
+     no control on them) on how to get to another.
+	 
+@ISP1
+	config t
+		access-list 2 permit host 55.55.55.55
+		access-list 3 permit host 44.44.44.44
+		no route-map MEDnotISP1
+		route-map MEDnotISP1 permit 10
+			match ip address 2 3
+			set metric 69
+			set as-path prepend 45 45
+		route-map MEDnotISP1 permit 20
+		router bgp 45
+			neigh 208.8.8.1 route-map MEDnotISP1 out
+			do clear ip bgp * soft
+			end
+			
+Your Turn:
+configure ISP2 to tell R1, to give the 22.22.22.22 route a metric of 222, and not
+use it also.
+
+ISP2:
+	config t
+_________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+
+end
+			end
+
+
+SLA: 
+using cisco IP SLA. the performance of the network can be monitored.
+this can be performed w/o deploying a physical probe. A router can be
+configured to send a generated packet to the destination device and once
+the destination device receives this packet, the device will respond with
+time-stamp info. for the source so that the source can make the calculation
+metric.
+
+How to configure IP SLA:
+
+STEP 1: CREATE AN IP SLA
+	no ip sla 4
+	ip sla 4
+		icmp-echo 206.6.6.6 source-int e1/4
+		threshold 3000
+		time 3000
+		freq 3
+		ip sla sched 4 life forever start-time now
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+
+STEP 2: CONFIGURE TRACKING
+	track 40 ip sla 4 reachability
+		delay down 1 up 1
+		end
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+		
+STEP 3: BEST TO USE STATIC ROUTES!
+	ip route 0.0.0.0 0.0.0.0 206.6.6.6 40
+	
+____________________________________
+____________________________________
+____________________________________
+
+	
+STEP 4: CREATE A PROTOCOL BASED ROUTING.
+	route-map PBR permit 40
+		match ip add 12
+		set ip next-hop verify-availability 206.6.6.6 track 40
+		
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+		
+STEP 5: USE NAT WITH PBR.
+	int e1/0
+		ip nat inside
+		ip policy route-map PBR
+	ip nat inside source route-map ISP4 int e1/2 overload
+		route-map ISP4 permit 40
+		match ip add 12
+		match int e1/2
+		end
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+
+			
+R1: TO BE RETURNED!
+
+config t
+router bgp 1
+ bgp log-neighbor-changes
+ network 10.0.0.0 mask 255.255.255.252
+ network 207.7.7.0
+ network 208.8.8.0
+ network 209.9.9.0
+ neighbor 207.7.7.2 remote-as 2
+ neighbor
+ 208.8.8.4 remote-as 45
+ neighbor 209.9.9.3 remote-as 3
+!
+
+r1:
+config t
+no router bgp 1
+!
+ip sla auto discovery
+!
+no ip sla 1
+ip sla 1
+ icmp-echo 208.8.8.4 source-interface e1/1
+ threshold 3000
+ timeout 3000
+ frequency 3
+ip sla schedule 1 life forever start-time now
+!
+no ip sla 2
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+!
+no ip sla 3
+ip sla 3
+ icmp-echo 209.9.9.3 source-interface e1/3
+ threshold 3000
+ timeout 3000
+ frequency 3
+ip sla schedule 3 life forever start-time now
+!
+!
+track 10 ip sla 1 reachability
+ delay down 1 up 1
+!
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+!
+track 30 ip sla 3 reachability
+ delay down 1 up 1
+!
+!
+ip route 55.55.55.55 255.255.255.255 208.8.8.4 track 10
+ip route 55.55.55.55 255.255.255.255 207.7.7.2 track 20
+ip route 55.55.55.55 255.255.255.255 209.9.9.3 30
+!
+ip route 0.0.0.0 0.0.0.0 208.8.8.4 track 10
+ip route 0.0.0.0 0.0.0.0 207.7.7.2 track 20
+ip route 0.0.0.0 0.0.0.0 209.9.9.3 30
+!
+!
+route-map PBR permit 10
+ match ip address 10
+ set ip next-hop verify-availability 208.8.8.4 1 track 10
+!
+route-map PBR permit 20
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+!
+route-map PBR permit 30
+ match ip address 12
+ set ip next-hop verify-availability 209.9.9.3 3 track 30
+!
+access-list 8 permit any
+access-list 10 permit any
+access-list 11 permit any
+access-list 12 permit any
+!
+int e1/1
+ ip nat outside
+int e1/2
+ ip nat outside
+int e1/3
+ ip nat outside
+int e1/0
+ ip nat inside
+ ip policy route-map PBR
+!
+ip nat inside source route-map ISP2 interface e1/2 overload
+route-map ISP2 permit 10
+ match ip address 8
+ match interface e1/2
+!
+ip nat inside source route-map ISP1 interface e1/1 overload
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+!
+ip nat inside source route-map ISP3 interface e1/3 overload
+route-map ISP3 permit 10
+ match ip address 8
+ match interface e1/3
+!
+show track 13
+
+show route-map
+
+show ip sla statistics
+
+show ip sla configuration
+
+
+######################################################			
+			
+
+
+R1:
+config t
+ip subnet-zero
+route-map CON
+ match interface lo 11
+int lo 11
+ ip add 11.11.11.11 255.255.255.255
+no router ospf 1
+router ospf 1
+ network 10.1.1.0 0.0.0.3 area 12
+ network 1.1.1.1 0.0.0.0 area 12
+ default-information originate
+ redistribute connected route-map CON metric-type 1 subnets
+!
+ 
+R2:
+config t
+ip subnet-zero
+no router ospf 1
+router ospf 1
+ network 10.1.1.4 0.0.0.3 area 0
+ network 10.1.1.0 0.0.0.3 area 12
+ network 2.2.2.2 0.0.0.0 area 0
+!
+
+R3:
+config t
+ip subnet-zero
+no router ospf 1
+router ospf 1
+ network 10.1.1.8 0.0.0.3 area 34
+ network 10.1.1.4 0.0.0.3 area 0
+ network 3.3.3.3 0.0.0.0 area 34
+! 
+
+ 
+R4:
+config t
+ip subnet-zero
+no router ospf 1
+router ospf 1
+ network 10.1.1.8 0.0.0.3 area 34
+ network 4.4.4.4 0.0.0.0 area 34
+!
+ 
+R4:
+show ip route ospf
+O*E2  0.0.0.0/0 [110/1] via 10.1.1.9, 00:00:22, Ethernet1/2
+      1.0.0.0/32 is subnetted, 1 subnets
+O IA     1.1.1.1 [110/31] via 10.1.1.9, 00:00:32, Ethernet1/2
+      2.0.0.0/32 is subnetted, 1 subnets
+O IA     2.2.2.2 [110/21] via 10.1.1.9, 00:00:32, Ethernet1/2
+      3.0.0.0/32 is subnetted, 1 subnets
+O        3.3.3.3 [110/11] via 10.1.1.9, 00:00:32, Ethernet1/2
+      10.0.0.0/8 is variably subnetted, 12 subnets, 4 masks
+O IA     10.1.1.0/30 [110/30] via 10.1.1.9, 00:00:32, Ethernet1/2
+O IA     10.1.1.4/30 [110/20] via 10.1.1.9, 00:00:32, Ethernet1/2
+      11.0.0.0/32 is subnetted, 1 subnets
+O E1     11.11.11.11 [110/50] via 10.1.1.9, 00:00:22, Ethernet1/2
+
+MAKE AREA 34 A STUB AREA:
+ 
+R3:
+config t
+ router ospf 1
+  area 34 stub
+
+R4:
+config t
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+ 
+r4:
+show ip route ospf
+O*IA  0.0.0.0/0 [110/11] via 10.1.1.9, 00:00:20, Ethernet1/2
+      1.0.0.0/32 is subnetted, 1 subnets
+O IA     1.1.1.1 [110/31] via 10.1.1.9, 00:00:20, Ethernet1/2
+      2.0.0.0/32 is subnetted, 1 subnets
+O IA     2.2.2.2 [110/21] via 10.1.1.9, 00:00:20, Ethernet1/2
+      3.0.0.0/32 is subnetted, 1 subnets
+O        3.3.3.3 [110/11] via 10.1.1.9, 00:00:20, Ethernet1/2
+      10.0.0.0/8 is variably subnetted, 12 subnets, 4 masks
+O IA     10.1.1.0/30 [110/30] via 10.1.1.9, 00:00:20, Ethernet1/2
+O IA     10.1.1.4/30 [110/20] via 10.1.1.9, 00:00:20, Ethernet1/2
+
+What was gone?
+Hence, Stub = no Oe1, or Oe2 its been replaced by O*IA
+but try to ping 1.1.1.1
+
+MAKE AREA 34 A TOTALLY STUBBY AREA:
+
+R3:
+config t
+ router ospf 1
+  no area 34 stub
+  area 34 stub no-summary
+
+R4:
+config t
+____________________________________
+____________________________________
+____________________________________
+____________________________________
+ 
+
+r4:sr ospf 
+O*IA  0.0.0.0/0 [110/11] via 10.1.1.9, 00:00:00, Ethernet1/2
+      3.0.0.0/32 is subnetted, 1 subnets
+O        3.3.3.3 [110/11] via 10.1.1.9, 00:00:00, Ethernet1/2
+
+in a Totally Stubby area, No OIA, OE2 only O*IA and O
+
+BUT THEN YOU REALIZE THAT AREA 34 AND R4 HAS EIGRP ON IT! OH SYET!!
+
+r3:
+!Cisco Proprietary
+config t
+ router ospf 1
+  no area 34 stub
+  no area 34 stub no-summary
+  area 34 nssa
+! 
+ 
+R4:
+config t
+ router ospf 1
+  no area 34 stub
+  no area 34 stub no-summary
+  redistribute eigrp 100 subnets
+  area 34 nssa
+  !
+  
+R3:
+O*E2  0.0.0.0/0 [110/1] via 10.1.1.5, 00:00:32, Ethernet1/1
+      1.0.0.0/32 is subnetted, 1 subnets
+O IA     1.1.1.1 [110/21] via 10.1.1.5, 00:00:32, Ethernet1/1
+      2.0.0.0/32 is subnetted, 1 subnets
+O        2.2.2.2 [110/11] via 10.1.1.5, 00:00:32, Ethernet1/1
+      4.0.0.0/32 is subnetted, 1 subnets
+O        4.4.4.4 [110/11] via 10.1.1.10, 00:00:04, Ethernet1/2
+      10.0.0.0/8 is variably subnetted, 9 subnets, 3 masks
+O IA     10.1.1.0/30 [110/20] via 10.1.1.5, 00:00:32, Ethernet1/1
+O N2     10.1.4.4/30 [110/20] via 10.1.1.10, 00:00:04, Ethernet1/2
+O N2     10.1.4.8/30 [110/20] via 10.1.1.10, 00:00:04, Ethernet1/2
+O N2     10.2.1.0/24 [110/20] via 10.1.1.10, 00:00:04, Ethernet1/2
+O N2     10.2.2.0/24 [110/20] via 10.1.1.10, 00:00:04, Ethernet1/2
+      11.0.0.0/32 is subnetted, 1 subnets
+O E1     11.11.11.11 [110/40] via 10.1.1.5, 00:00:32, Ethernet1/1
+      192.168.1.0/27 is subnetted, 1 subnets
+O N2     192.168.1.128 [110/20] via 10.1.1.10, 00:00:04, Ethernet1/2
+
+TASK3: HAVE A O*N2 GET INTO NSSA AREA 10.
+
+      1.0.0.0/32 is subnetted, 1 subnets
+O IA     1.1.1.1 [110/31] via 10.1.1.9, 00:00:47, Ethernet1/2
+      2.0.0.0/32 is subnetted, 1 subnets
+O IA     2.2.2.2 [110/21] via 10.1.1.9, 00:00:47, Ethernet1/2
+      3.0.0.0/32 is subnetted, 1 subnets
+O        3.3.3.3 [110/11] via 10.1.1.9, 00:00:57, Ethernet1/2
+      10.0.0.0/8 is variably subnetted, 12 subnets, 4 masks
+O IA     10.1.1.0/30 [110/30] via 10.1.1.9, 00:00:47, Ethernet1/2
+O IA     10.1.1.4/30 [110/20] via 10.1.1.9, 00:00:47, Ethernet1/2
+
+R3:
+config t
+ router ospf 1
+  area 34 nssa default-information-originate
+  
+r4:
+O*N2  0.0.0.0/0 [110/1] via 10.1.1.9, 00:00:15, Ethernet1/2
+      1.0.0.0/32 is subnetted, 1 subnets
+O IA     1.1.1.1 [110/31] via 10.1.1.9, 00:01:34, Ethernet1/2
+      2.0.0.0/32 is subnetted, 1 subnets
+O IA     2.2.2.2 [110/21] via 10.1.1.9, 00:01:34, Ethernet1/2
+      3.0.0.0/32 is subnetted, 1 subnets
+O        3.3.3.3 [110/11] via 10.1.1.9, 00:01:44, Ethernet1/2
+      10.0.0.0/8 is variably subnetted, 12 subnets, 4 masks
+O IA     10.1.1.0/30 [110/30] via 10.1.1.9, 00:01:34, Ethernet1/2
+O IA     10.1.1.4/30 [110/20] via 10.1.1.9, 00:01:34, Ethernet1/2
+
+ON all ABRs, we do:
+R3:
+config t
+ router ospf 1
+  area 34 nssa no-summary
+end
+
+R2:
+O*E2  0.0.0.0/0 [110/1] via 10.1.1.1, 00:10:00, Ethernet1/2
+      1.0.0.0/32 is subnetted, 1 subnets
+O        1.1.1.1 [110/11] via 10.1.1.1, 00:10:00, Ethernet1/2
+      3.0.0.0/32 is subnetted, 1 subnets
+O IA     3.3.3.3 [110/11] via 10.1.1.6, 00:18:59, Ethernet1/1
+      4.0.0.0/32 is subnetted, 1 subnets
+O IA     4.4.4.4 [110/21] via 10.1.1.6, 00:02:33, Ethernet1/1
+      10.0.0.0/8 is variably subnetted, 9 subnets, 3 masks
+O IA     10.1.1.8/30 [110/20] via 10.1.1.6, 00:18:59, Ethernet1/1
+O E2     10.1.4.4/30 [110/20] via 10.1.1.6, 00:02:32, Ethernet1/1
+O E2     10.1.4.8/30 [110/20] via 10.1.1.6, 00:02:32, Ethernet1/1
+O E2     10.2.1.0/24 [110/20] via 10.1.1.6, 00:02:32, Ethernet1/1
+O E2     10.2.2.0/24 [110/20] via 10.1.1.6, 00:02:32, Ethernet1/1
+      11.0.0.0/32 is subnetted, 1 subnets
+O E1     11.11.11.11 [110/30] via 10.1.1.1, 00:10:00, Ethernet1/2
+      192.168.1.0/27 is subnetted, 1 subnets
+O E2     192.168.1.128 [110/20] via 10.1.1.6, 00:02:32, Ethernet1/1
+
+R3:
+O*E2  0.0.0.0/0 [110/1] via 10.1.1.5, 00:01:46, Ethernet1/1
+      1.0.0.0/32 is subnetted, 1 subnets
+O IA     1.1.1.1 [110/21] via 10.1.1.5, 00:01:46, Ethernet1/1
+      2.0.0.0/32 is subnetted, 1 subnets
+O        2.2.2.2 [110/11] via 10.1.1.5, 00:01:46, Ethernet1/1
+      4.0.0.0/32 is subnetted, 1 subnets
+O        4.4.4.4 [110/11] via 10.1.1.10, 00:01:46, Ethernet1/2
+      10.0.0.0/8 is variably subnetted, 9 subnets, 3 masks
+O IA     10.1.1.0/30 [110/20] via 10.1.1.5, 00:01:46, Ethernet1/1
+O N2     10.1.4.4/30 [110/20] via 10.1.1.10, 00:01:46, Ethernet1/2
+O N2     10.1.4.8/30 [110/20] via 10.1.1.10, 00:01:46, Ethernet1/2
+O N2     10.2.1.0/24 [110/20] via 10.1.1.10, 00:01:46, Ethernet1/2
+O N2     10.2.2.0/24 [110/20] via 10.1.1.10, 00:01:46, Ethernet1/2
+      11.0.0.0/32 is subnetted, 1 subnets
+O E1     11.11.11.11 [110/40] via 10.1.1.5, 00:01:46, Ethernet1/1
+      192.168.1.0/27 is subnetted, 1 subnets
+O N2     192.168.1.128 [110/20] via 10.1.1.10, 00:01:46, Ethernet1/2
+
+route summarization in ASBR and ABR:
+
+R4:
+config t
+route-map TST
+ match interface lo040 lo41 lo42 lo43
+no int lo4
+int lo 40
+ ip add 4.4.0.4 255.255.255.255
+int lo 41
+ ip add 4.4.1.4 255.255.255.255
+int lo 42
+ ip add 4.4.2.4 255.255.255.255
+int lo 43
+ ip add 4.4.3.4 255.255.255.255
+int lo 44
+ ip add 4.4.4.4 255.255.255.255
+ ip ospf 1 area 34
+ ip ospf network point-to-point
+int lo 45
+ ip add 4.4.5.4 255.255.255.0
+ ip ospf 1 area 34
+ ip ospf network point-to-point
+int lo 46
+ ip add 4.4.6.4 255.255.255.0
+ ip ospf 1 area 34
+ ip ospf network point-to-point
+router ospf 1
+ redistribute connected route-map TST subnets
+ 
+R3(config)#do sr os | i 4.4
+O E2     4.4.0.4/32 [110/20] via 10.1.1.10, 00:00:24, Ethernet1/2
+O E2     4.4.1.4/32 [110/20] via 10.1.1.10, 00:00:24, Ethernet1/2
+O E2     4.4.2.4/32 [110/20] via 10.1.1.10, 00:00:24, Ethernet1/2
+O E2     4.4.3.4/32 [110/20] via 10.1.1.10, 00:00:24, Ethernet1/2
+O        4.4.4.4/32 [110/11] via 10.1.1.10, 00:00:24, Ethernet1/2
+O        4.4.5.0/24 [110/11] via 10.1.1.10, 00:00:24, Ethernet1/2
+O        4.4.6.0/24 [110/11] via 10.1.1.10, 00:00:24, Ethernet1/2
+
+R4:
+
+R4(config-router)#router ospf 1
+R4(config-router)# summary-address 4.4.0.0 255.255.252.0
+R4(config-router)#do sr os | inc Null
+O        4.4.0.0/22 is a summary, 00:00:21, Null0
+R4(config-router)#
+
+R3(config)#do sr os | i 4.4
+O E2     4.4.0.0/22 [110/20] via 10.1.1.10, 00:00:51, Ethernet1/2
+O        4.4.4.4/32 [110/11] via 10.1.1.10, 00:01:57, Ethernet1/2
+O        4.4.5.0/24 [110/11] via 10.1.1.10, 00:01:57, Ethernet1/2
+O        4.4.6.0/24 [110/11] via 10.1.1.10, 00:01:57, Ethernet1/2
+
+R1#sr os | inc 4.4
+O E2     4.4.0.0/22 [110/20] via 10.1.1.2, 00:01:33, Ethernet1/0
+O IA     4.4.4.4/32 [110/31] via 10.1.1.2, 00:02:40, Ethernet1/0
+O IA     4.4.5.0/24 [110/31] via 10.1.1.2, 00:02:40, Ethernet1/0
+O IA     4.4.6.0/24 [110/31] via 10.1.1.2, 00:02:40, Ethernet1/0
+
+so In R3(ABR) we do:
+
+r3:
+config t
+router ospf 1
+ area 34 range 4.4.4.0 255.255.252.0
+!
+
+R1#sr os | inc 4.4
+O E2     4.4.0.0 [110/20] via 10.1.1.2, 00:02:29, Ethernet1/0
+O IA     4.4.4.0 [110/31] via 10.1.1.2, 00:00:07, Ethernet1/0
+R1#
+
+
+
