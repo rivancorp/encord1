@@ -1,0 +1,130 @@
+Encor EnterPrise Lab Part1:
+CboreSwUp:
+config t
+hostname CboreSWtaas
+enable secret pass
+no logging console
+no ip domain-lookup
+alias exec bp show ip int brief | ex una
+alias exec sc sh run | section
+alias exec cn sh cdp neighbor
+Line console 0
+ no login
+ exec-timeout 0 0
+Line vty 0 14
+ password pass
+ exec-timeout 0 0
+Int Vlan 1
+ desc MANAGEMENTVLAN
+ no shut
+ ip add 10.12.1.2 255.255.255.0
+Int Vlan 10
+ desc WIRELESSVLAN
+ no shut
+ ip add 10.12.10.2 255.255.255.0
+Int Vlan 50
+ desc IPCAMERAVLAN
+ no shut
+ ip add 10.12.50.2 255.255.255.0
+Int Vlan 100
+ desc CUCMvoiceVLAN
+ no shut
+ ip add 10.12.100.2 255.255.255.0
+end
+!!!CoreBABA:
+CboreSwUp:
+config t
+hostname CboreSWbaba
+enable secret pass
+no logging console
+no ip domain-lookup
+alias exec bp show ip int brief | ex una
+alias exec sc sh run | section
+alias exec cn sh cdp neighbor
+Line console 0
+ no login
+ exec-timeout 0 0
+Line vty 0 14
+ password pass
+ exec-timeout 0 0
+Int Vlan 1
+ desc MANAGEMENTVLAN
+ no shut
+ ip add 10.12.1.4 255.255.255.0
+Int Vlan 10
+ desc WIRELESSVLAN
+ no shut
+ ip add 10.12.10.4 255.255.255.0
+Int Vlan 50
+ desc IPCAMERAVLAN
+ no shut
+ ip add 10.12.50.4 255.255.255.0
+Int Vlan 100
+ desc CUCMvoiceVLAN
+ no shut
+ ip add 10.12.100.4 255.255.255.0
+end
+#Creating wifi,video,voiceVlans:
+Taas/baba:
+config t
+int range fa 0/11-12
+ switchport trunk enc dot1Q
+ switchport mode trunk
+ do sh int trunk
+config t
+ vtp domain ccnp
+ vtp password encor
+ vtp mode server
+ exit 
+!Create the 3 vlans: taas
+!taas:
+config t
+vlan 10
+ name WIFI
+vlan 50 
+ name IPCAMERAVIDEO
+VLAN 100
+ name VOICEVLAN
+exit
+!baba:
+show vlan brief
+
+DHCP SERVER FOR 3Vlans:
+Baba:
+config t
+ip dhcp excluded-add 10.m.1.1 10.m.1.100
+ip dhcp excluded-add 10.m.10.1 10.m.10.100
+ip dhcp excluded-add 10.m.50.1 10.m.50.100
+ip dhcp excluded-add 10.m.100.1 10.m.100.100
+ip dhcp pool VLAN1DATA
+ network 10.m.1.0 255.255.255.0
+ default-router 10.m.1.4
+ domain-name VLAN1DATA.COM
+ dns-server 10.m.1.10
+ option 150 ip 10.m.100.8
+ip dhcp pool VLAN10-WIFI
+ network 10.m.10.0 255.255.255.0
+ default-router 10.m.10.4
+ domain-name VLAN10-WIFI.COM
+ dns-server 10.m.1.10
+ option 150 ip 10.m.100.8 
+ip dhcp pool VLAN50-IPCAMERA
+ network 10.m.50.0 255.255.255.0
+ default-router 10.m.50.4
+ domain-name VLAN50-IPCAMERA.COM
+ dns-server 10.m.1.10
+ option 150 ip 10.m.100.8 
+ip dhcp pool VLAN100-VOIP
+ network 10.12.100.0 255.255.255.0
+ default-router 10.12.100.4
+ domain-name VLAN100-VOIP.COM
+ dns-server 10.12.1.10
+ option 150 ip 10.12.100.8 
+ 
+!lipat ports to correct Vlan:
+Baba:
+config t
+Int Range Fa 0/2,fa0/4,fa0/6
+ switchport access vlan 10
+Int Range Fa 0/3,fa0/5,fa0/7
+ switchport access vlan 100
