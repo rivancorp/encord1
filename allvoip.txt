@@ -1,0 +1,120 @@
+!@@@CUCM-M
+config t
+   hostname CUCM-m
+   enable secret pass
+   service password-encryption
+   no logging console
+   no ip domain-lookup
+   line console 0
+     password pass
+     login
+     exec-timeout 0 0
+    line vty 0 14
+      password pass
+      login
+      exec-timeout 0 0
+   Int Fa 0/0
+     no shutdown
+	 ip add 10.12.100.8 255.255.255.0 
+	 end
+   
+!!!CUCM ANALOG PHONES CONFIG
+configure terminal
+dial-peer voice 1 pots
+   destination-pattern M00
+   port 0/0/0
+dial-peer voice 2 pots
+   destination-pattern M01
+   port 0/0/1
+dial-peer voice 3 pots
+   destination-pattern M02
+   port 0/0/2
+dial-peer voice 4 pots
+   destination-pattern M03
+   port 0/0/3
+end
+
+!!IP telephony
+config t
+no telephony-service
+telephony-service
+   no auto assign
+   no auto-reg-ephone
+   max-ephones 5
+   max-dn 20
+   ip source-address 10.M.100.8 port 2000
+   create cnf-files
+ephone-dn 1
+  number mM11
+ephone-dn 2
+  number mM22
+ephone-dn 3
+  number mM33
+ephone-dn 4
+  number mM44
+ephone-dn 5
+  number mM55
+ephone-dn 6
+  number mM66
+ephone-dn 7
+  number mM77
+ephone-dn 8
+  number mM88	
+Ephone 1
+  Mac-address ccd8.c1fb.1045
+  type 8945
+  button 1:1 2:2 3:3 4:4
+  restart
+Ephone 2
+  Mac-address ccd8.c1fb.2325
+  type 8945
+  button 1:5 2:6 3:7 4:8
+  restart  
+end
+
+@@@Enabling Video Calls
+configure terminal
+ephone 1
+   video
+   voice service voip
+   h323
+   call start slow
+ephone 2
+   video
+   voice service voip
+   h323
+   call start slow
+end
+
+!!@@allow incoming calls
+configure terminal
+voice service voip
+ip address trusted list
+ipv4 0.0.0.0 0.0.0.0
+exit
+
+configure terminal
+ dial-peer voice 11 Voip
+ destination-pattern 11..
+ session target ipv4:10.11.100.8
+ codec g711ULAW
+dial-peer voice 12 Voip
+ destination-pattern 12..
+ session target ipv4:10.12.100.8
+ codec g711ULAW
+dial-peer voice 21 Voip
+ destination-pattern 21..
+ session target ipv4:10.21.100.8
+ codec g711ULAW
+dial-peer voice 22 Voip
+ destination-pattern 22..
+ session target ipv4:10.22.100.8
+ codec g711ULAW
+dial-peer voice 31 Voip
+ destination-pattern 31..
+ session target ipv4:10.31.100.8
+ codec g711ULAW
+dial-peer voice 32 Voip
+ destination-pattern 32..
+ session target ipv4:10.32.100.8
+ codec g711ULAW
