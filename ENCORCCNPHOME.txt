@@ -1,0 +1,86 @@
+enable
+config t
+hostname ENCORlab
+enable secret pass
+no logging console
+no ip domain-lookup
+username admin privilege 15 secret pass
+line console 0
+ exec-timeout 0 0
+ no login
+line vty 0 14
+ transport input all
+ login local
+Int vlan 1
+ no shut
+ ip add 10.1.1.1 255.255.255.0
+end
+
+part2:
+config t
+ip dhcp excluded-add 10.1.1.1 10.1.1.150
+ip dhcp pool vlanone
+ network 10.1.1.0 255.255.255.0
+ default-router 10.1.1.1
+ domain-name encor.com
+ dns-server 8.8.8.8
+ option 150 ip 10.1.1.1
+end
+
+@@@
+!!IP telephony
+config t
+no telephony-service
+telephony-service
+   no auto assign
+   no auto-reg-ephone
+   max-ephones 12
+   max-dn 48
+   ip source-address 10.1.1.1 port 2000
+   create cnf-files
+ephone-dn 1
+  number 1211
+ephone-dn 2
+  number 1222
+ephone-dn 3
+  number 1233
+ephone-dn 4
+  number 1244
+ephone-dn 5
+  number 1255
+ephone-dn 6
+  number 1266
+ephone-dn 7
+  number 1277
+ephone-dn 8
+  number 1288
+ephone-dn 9
+  number 1268
+ephone-dn 10
+  number 1223
+Ephone 1
+  Mac-address 2c54.2d0e.f828
+  type 8945
+  button 1:1 2:3 3:2 4:4
+  restart
+Ephone 2
+  Mac-address 204c.9e6c.f109
+  type 8945
+  button 1:8 2:7 3:3 4:5
+  restart  
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
