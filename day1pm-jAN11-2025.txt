@@ -404,7 +404,7 @@ SIP CONFIGURATION
 conf t
  voice service voip
   allow-connections h323 to sip
-          
+   !       
   allow-connections sip to h323
   allow-connections sip to sip
   supplementary-service h450.12
@@ -436,7 +436,7 @@ conf t
     username ____ password ____
     codec g711ulaw
 !
-  voice register pool 1
+  voice register pool 2
     id mac ____.____.____
     number 1 dn 2
     dtmf-relay sip-notify
@@ -455,4 +455,29 @@ exit
           
 sip-ua
 sip-server ipv4:192.168.k.1
+
+######## Giving 60% BANDWIDTH TO VOICE, 40% TO EVERYTHING ELSE ###########
+HOW TO CONFIGURE QUALITY OF SERVICE:
+CUCM:  "cm-pm-sp"
+config t
+class-map match-any VOICE
+   match protocol sip
+   match protocol rtp
+   match protocol sccp
+ Policy-map QOS-POLICY
+    class VOICE
+      bandwidth percent 60
+    class class-default
+      bandwidth percent 40
+   Interface fa0/0
+      service-policy output QOS-POLICY
+ end
+show policy-map QOS-POLICY
+
+
+
+
+
+
+
 
