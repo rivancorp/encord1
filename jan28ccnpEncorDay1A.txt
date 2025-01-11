@@ -67,10 +67,14 @@ end
 #Creating wifi,video,voiceVlans:
 Taas/baba:
 config t
-int range fa 0/11-12
+int range fa 0/10-12
+ shutdown
  switchport trunk enc dot1Q
  switchport mode trunk
- do sh int trunk
+ Channel-group 1 mode active
+ !act+passive, act+act, NOT=pass +pass
+ channel-protocol lacp
+ no shut
 config t
  vtp domain ccnp
  vtp password encor
